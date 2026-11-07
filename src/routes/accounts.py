@@ -1,6 +1,8 @@
 from datetime import datetime, timezone, timedelta, date
+import os
 from os import access
 from typing import cast
+from dotenv import load_dotenv
 
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy import select, delete
@@ -22,10 +24,18 @@ from database import (
 from database.validators.accounts import validate_token
 from exceptions import BaseSecurityError
 from schemas import UserRegistrationResponseSchema, UserRegistrationRequestSchema, UserActivationRequestSchema
-from schemas.accounts import UserBase
+from schemas.accounts import UserBase, PasswordResetRequest
 from security.interfaces import JWTAuthManagerInterface
+from security.token_manager import JWTAuthManager
 
+load_dotenv()
 router = APIRouter()
+jwt_auth_manager = JWTAuthManager(os.getenv("SECRET_KEY_ACCESS"), os.getenv("SECRET_KEY_REFRESH"), os.getenv("JWT_SIGNING_ALGORITHM"))
+
+
+# @router.post("/reset-password/complete/")
+# async def password_reset_complete(data: PasswordResetRequest, db: Session = Depends(get_db)):
+
 
 @router.post("/password-reset/request/", status_code=200)
 async def password_reset_request(data: UserBase, db: AsyncSession = Depends(get_db)):
@@ -84,7 +94,6 @@ async def user_registration(
 ):
     try:
         new_user = await create_user(db, schema_in)
-        new_user.access_token = create_access_token(data={"sub": schema_in.email})
     except IntegrityError:
         await db.rollback()
         raise HTTPException(409, f"A user with this email {schema_in.email} already exists.")

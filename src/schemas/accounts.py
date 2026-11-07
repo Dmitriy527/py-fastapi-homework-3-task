@@ -1,10 +1,12 @@
 from typing import Annotated
 
 from fastapi import HTTPException
-from pydantic import BaseModel, EmailStr, field_validator, Field, ValidationError
+from pydantic import BaseModel, EmailStr, field_validator, Field, ValidationError, ConfigDict
+from datetime import datetime
+
 from database.validators.accounts import validate_email, validate_password_strength, validate_token
 
-from database import accounts_validators
+from database import accounts_validators, ActivationTokenModel
 
 
 class UserBase(BaseModel):
@@ -17,6 +19,17 @@ class UserBase(BaseModel):
         email = validate_email(value)
 
         return email
+
+
+class PasswordResetRequest(UserBase):
+    token: str
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def check_password(cls, value: str) -> str:
+        password = validate_password_strength(value)
+        return password
 
 
 class UserRegistrationRequestSchema(UserBase):
@@ -36,8 +49,16 @@ class UserRegistrationRequestSchema(UserBase):
 
         return password
 
+
+class TokenOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    token: str
+    expires_at: datetime
+
+
 class UserRegistrationResponseSchema(UserBase):
     id: int
+    activation_token: TokenOut | None = None
 
     class Config:
         from_attributes = True
@@ -48,5 +69,3 @@ class Token(BaseModel):
 
 class UserActivationRequestSchema(UserBase):
     token: str
-
-

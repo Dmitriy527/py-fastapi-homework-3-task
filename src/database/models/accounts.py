@@ -164,7 +164,7 @@ class TokenBaseModel(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     token: Mapped[str] = mapped_column(
-        String(64),
+        String(512),
         unique=True,
         nullable=False,
         default=generate_secure_token
