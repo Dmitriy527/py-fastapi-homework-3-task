@@ -1,7 +1,10 @@
 import os
 from datetime import timedelta, datetime
+from typing import cast
+
 from dotenv import load_dotenv
 from jose import jwt
+from sqlalchemy.orm import selectinload
 
 load_dotenv()
 
@@ -9,7 +12,7 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from database import UserGroupEnum, UserGroupModel, ActivationTokenModel
+from database import UserGroupEnum, UserGroupModel, ActivationTokenModel, PasswordResetTokenModel
 
 from database.models.accounts import UserModel
 from schemas import UserRegistrationRequestSchema
@@ -17,7 +20,7 @@ from security.passwords import hash_password
 
 
 async def get_user_by_email(db: AsyncSession, email: str) -> UserModel:
-    result = await db.execute(select(UserModel).where(UserModel.email == email))
+    result = await db.execute(select(UserModel).options(selectinload(UserModel.password_reset_token)).where(UserModel.email == email))
     return result.scalar_one_or_none()
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
@@ -52,3 +55,13 @@ async def create_user(db: AsyncSession, user: UserRegistrationRequestSchema) -> 
     await db.refresh(db_user)
 
     return db_user
+
+
+async def create_reset_token(db: AsyncSession, user: UserModel):
+    reset_token_model = PasswordResetTokenModel(user_id=cast(int, user.id))
+    if user.password_reset_token:
+        await db.delete(user.password_reset_token)
+        await db.flush()
+    user.password_reset_token = reset_token_model
+    await db.commit()
+    await db.refresh(user)

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session, joinedload
 
 from config import get_jwt_auth_manager, get_settings, BaseAppSettings
-from crud import create_user, get_user_by_email, create_access_token
+from crud import create_user, get_user_by_email, create_access_token, create_reset_token
 from database import (
     get_db,
     UserModel,
@@ -22,9 +22,18 @@ from database import (
 from database.validators.accounts import validate_token
 from exceptions import BaseSecurityError
 from schemas import UserRegistrationResponseSchema, UserRegistrationRequestSchema, UserActivationRequestSchema
+from schemas.accounts import UserBase
 from security.interfaces import JWTAuthManagerInterface
 
 router = APIRouter()
+
+@router.post("/password-reset/request/", status_code=200)
+async def password_reset_request(data: UserBase, db: AsyncSession = Depends(get_db)):
+    user = await get_user_by_email(db=db, email=data.email)
+    if user and user.is_active:
+        await create_reset_token(db=db, user=user)
+    return {"message": "If you are registered, you will receive an email with instructions."}
+
 
 @router.post("/activate/", status_code=200)
 async def user_activation(
