@@ -74,6 +74,10 @@ class UserLoginResponseSchema(BaseModel):
     refresh_token: str
     token_type: str
 
+class UserLoginRequestSchema(UserBase):
+    email: str
+    password: str
+
 
 class TokenRefreshRequestSchema(BaseModel):
     refresh_token: str

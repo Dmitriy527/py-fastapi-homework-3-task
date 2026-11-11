@@ -11,5 +11,6 @@ from schemas.accounts import (
     UserActivationRequestSchema,
     PasswordResetCompleteRequestSchema,
     TokenRefreshRequestSchema,
-    TokenRefreshResponseSchema
+    TokenRefreshResponseSchema,
+    UserLoginRequestSchema
 )

@@ -17,7 +17,7 @@ from database import (
 )
 from exceptions import TokenExpiredError, InvalidTokenError
 from schemas import UserRegistrationResponseSchema, UserRegistrationRequestSchema, UserActivationRequestSchema, \
-    TokenRefreshResponseSchema
+    TokenRefreshResponseSchema, UserLoginRequestSchema
 from schemas.accounts import UserBase, PasswordResetCompleteRequestSchema, UserLoginResponseSchema, \
     TokenRefreshRequestSchema
 from security.passwords import hash_password, verify_password
@@ -67,7 +67,7 @@ async def refresh_token(request: TokenRefreshRequestSchema, db: AsyncSession = D
 
 
 @router.post("/login/", response_model=UserLoginResponseSchema, status_code=201)
-async def login(request: UserRegistrationRequestSchema, db: AsyncSession = Depends(get_db)):
+async def login(request: UserLoginRequestSchema, db: AsyncSession = Depends(get_db)):
     user = await get_user_by_email(db=db, email=request.email)
 
     if not user or not verify_password(request.password, user._hashed_password):
