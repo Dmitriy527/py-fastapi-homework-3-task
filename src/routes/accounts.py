@@ -184,9 +184,9 @@ async def user_registration(
         schema_in: UserRegistrationRequestSchema,
         db: AsyncSession = Depends(get_db)
 ):
-    # old_user = get_user_by_email(db=db, email=schema_in.email)
-    # if old_user is not None:
-    #     raise HTTPException(409, f"A user with this email {schema_in.email} already exists.")
+    old_user = await get_user_by_email(db=db, email=schema_in.email)
+    if old_user is not None:
+        raise HTTPException(409, f"A user with this email {schema_in.email} already exists.")
     try:
         new_user = await create_user(db, schema_in)
     except IntegrityError:
