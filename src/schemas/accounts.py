@@ -21,7 +21,7 @@ class UserBase(BaseModel):
         return email
 
 
-class PasswordResetRequest(UserBase):
+class PasswordResetCompleteRequestSchema(UserBase):
     token: str
     password: str
 

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy import select, delete
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from config import get_jwt_auth_manager, get_settings, BaseAppSettings
 from crud import create_user, get_user_by_email, create_access_token, create_reset_token
@@ -24,8 +24,9 @@ from database import (
 from database.validators.accounts import validate_token
 from exceptions import BaseSecurityError
 from schemas import UserRegistrationResponseSchema, UserRegistrationRequestSchema, UserActivationRequestSchema
-from schemas.accounts import UserBase, PasswordResetRequest
+from schemas.accounts import UserBase, PasswordResetCompleteRequestSchema
 from security.interfaces import JWTAuthManagerInterface
+from security.passwords import hash_password, verify_password
 from security.token_manager import JWTAuthManager
 
 load_dotenv()
@@ -33,8 +34,36 @@ router = APIRouter()
 jwt_auth_manager = JWTAuthManager(os.getenv("SECRET_KEY_ACCESS"), os.getenv("SECRET_KEY_REFRESH"), os.getenv("JWT_SIGNING_ALGORITHM"))
 
 
-# @router.post("/reset-password/complete/")
-# async def password_reset_complete(data: PasswordResetRequest, db: Session = Depends(get_db)):
+@router.post("/reset-password/complete/", status_code=200)
+async def password_reset_complete(data: PasswordResetCompleteRequestSchema, db: AsyncSession = Depends(get_db)):
+    user = await get_user_by_email(db=db, email=data.email)
+    if user is None or not user.is_active:
+        raise HTTPException(400, detail="Invalid email or token.")
+    user_reset_password = user.password_reset_token
+    if not user_reset_password:
+        raise HTTPException(400, detail="Invalid email or token.")
+    is_token = (user_reset_password.token == data.token)
+    expires_at = user_reset_password.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if not is_token or expires_at < datetime.now(timezone.utc):
+        await db.delete(user_reset_password)
+        await db.commit()
+        await db.refresh(user)
+        raise HTTPException(400, detail="Invalid email or token.")
+
+    try:
+        hashed = hash_password(data.password)
+        user._hashed_password = hashed
+        await db.delete(user_reset_password)
+        await db.commit()
+        await db.refresh(user)
+    except (IntegrityError, SQLAlchemyError):
+        await db.rollback()
+        raise HTTPException(500, detail="An error occurred while resetting the password.")
+
+    return {"message": "Password reset successfully."}
 
 
 @router.post("/password-reset/request/", status_code=200)
@@ -43,6 +72,7 @@ async def password_reset_request(data: UserBase, db: AsyncSession = Depends(get_
     if user and user.is_active:
         await create_reset_token(db=db, user=user)
     return {"message": "If you are registered, you will receive an email with instructions."}
+# {"message": f"Password reset token {user.password_reset_token.token} is valid!"}
 
 
 @router.post("/activate/", status_code=200)

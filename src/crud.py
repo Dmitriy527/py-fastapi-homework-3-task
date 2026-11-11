@@ -67,7 +67,6 @@ async def create_user(db: AsyncSession, user: UserRegistrationRequestSchema) -> 
 
     return db_user
 
-
 async def create_reset_token(db: AsyncSession, user: UserModel):
     reset_token_model = PasswordResetTokenModel(user_id=cast(int, user.id))
     if user.password_reset_token:
@@ -75,4 +74,4 @@ async def create_reset_token(db: AsyncSession, user: UserModel):
         await db.flush()
     user.password_reset_token = reset_token_model
     await db.commit()
-    await db.refresh(user)
+    await db.refresh(user,["password_reset_token"])
