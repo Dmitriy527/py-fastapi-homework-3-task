@@ -36,11 +36,11 @@ jwt_auth_manager = JWTAuthManager(
 @router.post("/refresh/", response_model=TokenRefreshResponseSchema, status_code=200)
 async def refresh_token(request: TokenRefreshRequestSchema, db: AsyncSession = Depends(get_db)):
     try:
-        jwt_auth_manager.decode_refresh_token(token=request.refresh_token)
+        data = jwt_auth_manager.decode_refresh_token(token=request.refresh_token)
     except TokenExpiredError:
         raise HTTPException(400, "Token has expired.")
     except InvalidTokenError:
-        raise HTTPException(400, "Refresh token not found.")
+        raise HTTPException(401, "Refresh token not found.")
 
     refresh_token_model_execute = await db.execute(
         select(RefreshTokenModel).where(
@@ -50,9 +50,9 @@ async def refresh_token(request: TokenRefreshRequestSchema, db: AsyncSession = D
     refresh_token_model = refresh_token_model_execute.scalar_one_or_none()
 
     if refresh_token_model is None:
-        raise HTTPException(400, "Refresh token not found.")
+        raise HTTPException(401, "Refresh token not found.")
 
-    user_execute = await db.execute(select(UserModel).where(UserModel.id == refresh_token_model.user_id))
+    user_execute = await db.execute(select(UserModel).where(UserModel.id == data["user_id"]))
     user = user_execute.scalar_one_or_none()
 
     if user is None:
@@ -184,9 +184,9 @@ async def user_registration(
         schema_in: UserRegistrationRequestSchema,
         db: AsyncSession = Depends(get_db)
 ):
-    old_user = get_user_by_email(db=db, email=schema_in.email)
-    if old_user:
-        raise HTTPException(409, f"A user with this email {schema_in.email} already exists.")
+    # old_user = get_user_by_email(db=db, email=schema_in.email)
+    # if old_user is not None:
+    #     raise HTTPException(409, f"A user with this email {schema_in.email} already exists.")
     try:
         new_user = await create_user(db, schema_in)
     except IntegrityError:
