@@ -40,7 +40,7 @@ async def refresh_token(request: TokenRefreshRequestSchema, db: AsyncSession = D
     except TokenExpiredError:
         raise HTTPException(400, "Token has expired.")
     except InvalidTokenError:
-        raise HTTPException(401, "Refresh token not found.")
+        raise HTTPException(400, "Refresh token not found.")
 
     refresh_token_model_execute = await db.execute(
         select(RefreshTokenModel).where(
@@ -153,12 +153,11 @@ async def user_activation(
         )
     )
     token = (await db.execute(stmt)).scalars().first()
-
-    if token is None:
+    try:
+        if token.user.is_active is True:
+            raise HTTPException(400, "User account is already active.")
+    except AttributeError:
         raise HTTPException(400, "Invalid or expired activation token.")
-
-    if token.user.is_active:
-        raise HTTPException(400, "User account is already active.")
 
     expires_at = token.expires_at
     if expires_at.tzinfo is None:  # SQLite повертає naive datetime

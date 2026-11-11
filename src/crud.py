@@ -1,6 +1,5 @@
 import os
-import random
-import string
+import secrets
 from datetime import timedelta, datetime, timezone
 from typing import cast
 from dotenv import load_dotenv
@@ -47,7 +46,7 @@ async def create_user(db: AsyncSession, user: UserRegistrationRequestSchema) -> 
 
     activation_token = ActivationTokenModel(
         user_id=db_user.id,
-        token=''.join(random.choices(string.ascii_letters + string.digits, k=32)),
+        token=secrets.token_urlsafe(64),
         expires_at=datetime.now(timezone.utc) + timedelta(days=15)
     )
 
