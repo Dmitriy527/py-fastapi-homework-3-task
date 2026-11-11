@@ -45,15 +45,16 @@ class UserRegistrationRequestSchema(UserBase):
         return password
 
 
-class TokenOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    token: str
-    expires_at: datetime
+# class TokenOut(BaseModel):
+#     model_config = ConfigDict(from_attributes=True)
+#     token: str
+#     expires_at: datetime
 
 
 class UserRegistrationResponseSchema(UserBase):
     id: int
-    activation_token: TokenOut | None = None
+    email: str
+    # activation_token: TokenOut | None = None
 
     class Config:
         from_attributes = True

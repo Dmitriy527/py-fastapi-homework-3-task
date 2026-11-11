@@ -37,8 +37,10 @@ jwt_auth_manager = JWTAuthManager(
 async def refresh_token(request: TokenRefreshRequestSchema, db: AsyncSession = Depends(get_db)):
     try:
         jwt_auth_manager.decode_refresh_token(token=request.refresh_token)
-    except (TokenExpiredError, InvalidTokenError):
+    except TokenExpiredError:
         raise HTTPException(400, "Token has expired.")
+    except InvalidTokenError:
+        raise HTTPException(401, "Refresh token not found.")
 
     refresh_token_model_execute = await db.execute(
         select(RefreshTokenModel).where(
@@ -155,6 +157,9 @@ async def user_activation(
     if token is None:
         raise HTTPException(400, "Invalid or expired activation token.")
 
+    if token.user.is_active:
+        raise HTTPException(400, "User account is already active.")
+
     expires_at = token.expires_at
     if expires_at.tzinfo is None:  # SQLite повертає naive datetime
         expires_at = expires_at.replace(tzinfo=timezone.utc)
@@ -163,9 +168,6 @@ async def user_activation(
         await db.delete(token)
         await db.commit()
         raise HTTPException(400, "Invalid or expired activation token.")
-
-    if token.user.is_active:
-        raise HTTPException(400, "User account is already active.")
 
     token.user.is_active = True
     await db.delete(token)
@@ -188,7 +190,7 @@ async def user_registration(
     except IntegrityError:
         await db.rollback()
         raise HTTPException(409, f"A user with this email {schema_in.email} already exists.")
-    except SQLAlchemyError:
+    except Exception:
         await db.rollback()
         raise HTTPException(500, "An error occurred during user creation.")
     return UserRegistrationResponseSchema.model_validate(new_user)

@@ -1,4 +1,6 @@
 import os
+import random
+import string
 from datetime import timedelta, datetime, timezone
 from typing import cast
 from dotenv import load_dotenv
@@ -45,11 +47,7 @@ async def create_user(db: AsyncSession, user: UserRegistrationRequestSchema) -> 
 
     activation_token = ActivationTokenModel(
         user_id=db_user.id,
-        token=jwt_auth_manager._create_token(
-            data={"sub": user.email},
-            secret_key=os.getenv("SECRET_KEY_ACCESS"),
-            expires_delta=timedelta(days=15),
-        ),
+        token=''.join(random.choices(string.ascii_letters + string.digits, k=32)),
         expires_at=datetime.now(timezone.utc) + timedelta(days=15)
     )
 
@@ -68,6 +66,7 @@ async def create_reset_token(db: AsyncSession, user: UserModel):
             secret_key=os.getenv("SECRET_KEY_ACCESS"),
             expires_delta=timedelta(days=30)
         ),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=30)
     )
 
     if user.password_reset_token:
