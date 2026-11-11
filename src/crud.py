@@ -45,7 +45,11 @@ async def create_user(db: AsyncSession, user: UserRegistrationRequestSchema) -> 
 
     activation_token = ActivationTokenModel(
         user_id=db_user.id,
-        token=jwt_auth_manager.create_access_token(data={"sub": user.email}),
+        token=jwt_auth_manager._create_token(
+            data={"sub": user.email},
+            secret_key=os.getenv("SECRET_KEY_ACCESS"),
+            expires_delta=timedelta(days=15),
+        ),
         expires_at=datetime.now(timezone.utc) + timedelta(days=15)
     )
 
@@ -57,7 +61,14 @@ async def create_user(db: AsyncSession, user: UserRegistrationRequestSchema) -> 
 
 
 async def create_reset_token(db: AsyncSession, user: UserModel):
-    reset_token_model = PasswordResetTokenModel(user_id=cast(int, user.id))
+    reset_token_model = PasswordResetTokenModel(
+        user_id=cast(int, user.id),
+        token=jwt_auth_manager._create_token(
+            data={"sub": user.email},
+            secret_key=os.getenv("SECRET_KEY_ACCESS"),
+            expires_delta=timedelta(days=30)
+        ),
+    )
 
     if user.password_reset_token:
         await db.delete(user.password_reset_token)

@@ -36,7 +36,7 @@ jwt_auth_manager = JWTAuthManager(
 @router.post("/refresh/", response_model=TokenRefreshResponseSchema, status_code=200)
 async def refresh_token(request: TokenRefreshRequestSchema, db: AsyncSession = Depends(get_db)):
     try:
-        jwt_auth_manager.verify_refresh_token_or_raise(token=request.refresh_token)
+        jwt_auth_manager.decode_refresh_token(token=request.refresh_token)
     except (TokenExpiredError, InvalidTokenError):
         raise HTTPException(400, "Token has expired.")
 
@@ -60,15 +60,6 @@ async def refresh_token(request: TokenRefreshRequestSchema, db: AsyncSession = D
         data={"user_id": user.id},
         expires_delta=timedelta(days=15)
     )
-    activation_token = ActivationTokenModel(
-        user_id=cast(int, user.id),
-        token=new_access_token,
-        expires_at=datetime.now(timezone.utc) + timedelta(days=15),
-    )
-
-    db.add(activation_token)
-    await db.commit()
-    await db.refresh(user, ["activation_token"])
 
     return {"access_token": f"{new_access_token}"}
 
