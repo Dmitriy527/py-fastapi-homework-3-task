@@ -15,9 +15,9 @@ from security.passwords import hash_password
 
 load_dotenv()
 jwt_auth_manager = JWTAuthManager(
-    os.getenv("SECRET_KEY_ACCESS"),
-    os.getenv("SECRET_KEY_REFRESH"),
-    os.getenv("JWT_SIGNING_ALGORITHM")
+    secret_key_access=os.getenv("SECRET_KEY_ACCESS"),
+    secret_key_refresh=os.getenv("SECRET_KEY_REFRESH"),
+    algorithm=os.getenv("JWT_SIGNING_ALGORITHM")
 )
 
 

@@ -27,9 +27,9 @@ from security.token_manager import JWTAuthManager
 load_dotenv()
 router = APIRouter()
 jwt_auth_manager = JWTAuthManager(
-    os.getenv("SECRET_KEY_ACCESS"),
-    os.getenv("SECRET_KEY_REFRESH"),
-    os.getenv("JWT_SIGNING_ALGORITHM")
+    secret_key_access=os.getenv("SECRET_KEY_ACCESS"),
+    secret_key_refresh=os.getenv("SECRET_KEY_REFRESH"),
+    algorithm=os.getenv("JWT_SIGNING_ALGORITHM")
 )
 
 
