@@ -69,3 +69,8 @@ class Token(BaseModel):
 
 class UserActivationRequestSchema(UserBase):
     token: str
+
+class UserLoginResponseSchema(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str

@@ -24,7 +24,7 @@ from database import (
 from database.validators.accounts import validate_token
 from exceptions import BaseSecurityError
 from schemas import UserRegistrationResponseSchema, UserRegistrationRequestSchema, UserActivationRequestSchema
-from schemas.accounts import UserBase, PasswordResetCompleteRequestSchema
+from schemas.accounts import UserBase, PasswordResetCompleteRequestSchema, UserLoginResponseSchema
 from security.interfaces import JWTAuthManagerInterface
 from security.passwords import hash_password, verify_password
 from security.token_manager import JWTAuthManager
@@ -34,16 +34,47 @@ router = APIRouter()
 jwt_auth_manager = JWTAuthManager(os.getenv("SECRET_KEY_ACCESS"), os.getenv("SECRET_KEY_REFRESH"), os.getenv("JWT_SIGNING_ALGORITHM"))
 
 
+@router.post("/login/", response_model=UserLoginResponseSchema, status_code=201)
+async def login(request: UserRegistrationRequestSchema, db: AsyncSession = Depends(get_db)):
+    user = await get_user_by_email(db=db, email=request.email)
+
+    if not user or not verify_password(request.password, user._hashed_password):
+        raise HTTPException(401, "Invalid email or password.")
+    if not user.is_active:
+        raise HTTPException(403, "User account is not activated.")
+
+    user_id = user.id
+
+    try:
+        refresh_token = jwt_auth_manager.create_refresh_token(data={"user_id": user_id})
+        refresh_token_model = RefreshTokenModel.create(user_id=cast(int, user_id), days_valid=7, token=refresh_token)
+        db.add(refresh_token_model)
+        await db.commit()
+        await db.refresh(refresh_token_model)
+    except (IntegrityError, SQLAlchemyError):
+        await db.rollback()
+        raise HTTPException(500, "An error occurred while processing the request.")
+
+    access_token = jwt_auth_manager.create_access_token(data={"user_id": user_id})
+
+    return UserLoginResponseSchema(access_token=access_token, refresh_token=refresh_token, token_type="bearer")
+
+
 @router.post("/reset-password/complete/", status_code=200)
 async def password_reset_complete(data: PasswordResetCompleteRequestSchema, db: AsyncSession = Depends(get_db)):
     user = await get_user_by_email(db=db, email=data.email)
+
     if user is None or not user.is_active:
         raise HTTPException(400, detail="Invalid email or token.")
+
     user_reset_password = user.password_reset_token
+
     if not user_reset_password:
         raise HTTPException(400, detail="Invalid email or token.")
+
     is_token = (user_reset_password.token == data.token)
     expires_at = user_reset_password.expires_at
+
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
 
