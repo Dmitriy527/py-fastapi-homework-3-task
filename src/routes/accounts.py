@@ -50,7 +50,7 @@ async def refresh_token(request: TokenRefreshRequestSchema, db: AsyncSession = D
     refresh_token_model = refresh_token_model_execute.scalar_one_or_none()
 
     if refresh_token_model is None:
-        raise HTTPException(401, "Refresh token not found.")
+        raise HTTPException(400, "Refresh token not found.")
 
     user_execute = await db.execute(select(UserModel).where(UserModel.id == refresh_token_model.user_id))
     user = user_execute.scalar_one_or_none()
@@ -184,6 +184,9 @@ async def user_registration(
         schema_in: UserRegistrationRequestSchema,
         db: AsyncSession = Depends(get_db)
 ):
+    old_user = get_user_by_email(db=db, email=schema_in.email)
+    if old_user:
+        raise HTTPException(409, f"A user with this email {schema_in.email} already exists.")
     try:
         new_user = await create_user(db, schema_in)
     except IntegrityError:
