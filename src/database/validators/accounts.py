@@ -2,12 +2,10 @@ import os
 import re
 from datetime import datetime, timedelta
 from http.client import HTTPException
-
 from dotenv import load_dotenv
-load_dotenv()
-
 import email_validator
-from jose import jwt, JWTError
+
+load_dotenv()
 
 
 def validate_password_strength(password: str) -> str:
@@ -32,14 +30,3 @@ def validate_email(user_email: str) -> str:
         raise ValueError(str(error))
     else:
         return email
-
-def validate_token(token: str):
-    try:
-        jwt_validate = jwt.decode(
-            token,
-            os.getenv("SECRET_KEY_ACCESS"),
-            algorithms=[os.getenv("JWT_SIGNING_ALGORITHM")],
-        )
-        return jwt_validate
-    except JWTError:
-        return None

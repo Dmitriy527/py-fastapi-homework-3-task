@@ -1,37 +1,76 @@
-from datetime import datetime, timezone, timedelta, date
+from datetime import datetime, timezone, timedelta
 import os
-from os import access
 from typing import cast
 from dotenv import load_dotenv
-
-from fastapi import APIRouter, Depends, status, HTTPException
-from sqlalchemy import select, delete
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy.orm import joinedload
 
-from config import get_jwt_auth_manager, get_settings, BaseAppSettings
-from crud import create_user, get_user_by_email, create_access_token, create_reset_token
+from crud import create_user, get_user_by_email, create_reset_token
 from database import (
     get_db,
     UserModel,
-    UserGroupModel,
-    UserGroupEnum,
     ActivationTokenModel,
-    PasswordResetTokenModel,
     RefreshTokenModel
 )
-from database.validators.accounts import validate_token
-from exceptions import BaseSecurityError
-from schemas import UserRegistrationResponseSchema, UserRegistrationRequestSchema, UserActivationRequestSchema
-from schemas.accounts import UserBase, PasswordResetCompleteRequestSchema, UserLoginResponseSchema
-from security.interfaces import JWTAuthManagerInterface
+from exceptions import TokenExpiredError, InvalidTokenError
+from schemas import UserRegistrationResponseSchema, UserRegistrationRequestSchema, UserActivationRequestSchema, \
+    TokenRefreshResponseSchema
+from schemas.accounts import UserBase, PasswordResetCompleteRequestSchema, UserLoginResponseSchema, \
+    TokenRefreshRequestSchema
 from security.passwords import hash_password, verify_password
 from security.token_manager import JWTAuthManager
 
+
 load_dotenv()
 router = APIRouter()
-jwt_auth_manager = JWTAuthManager(os.getenv("SECRET_KEY_ACCESS"), os.getenv("SECRET_KEY_REFRESH"), os.getenv("JWT_SIGNING_ALGORITHM"))
+jwt_auth_manager = JWTAuthManager(
+    os.getenv("SECRET_KEY_ACCESS"),
+    os.getenv("SECRET_KEY_REFRESH"),
+    os.getenv("JWT_SIGNING_ALGORITHM")
+)
+
+
+@router.post("/refresh/", response_model=TokenRefreshResponseSchema, status_code=200)
+async def refresh_token(request: TokenRefreshRequestSchema, db: AsyncSession = Depends(get_db)):
+    try:
+        jwt_auth_manager.verify_refresh_token_or_raise(token=request.refresh_token)
+    except (TokenExpiredError, InvalidTokenError):
+        raise HTTPException(400, "Token has expired.")
+
+    refresh_token_model_execute = await db.execute(
+        select(RefreshTokenModel).where(
+            RefreshTokenModel.token == request.refresh_token
+        )
+    )
+    refresh_token_model = refresh_token_model_execute.scalar_one_or_none()
+
+    if refresh_token_model is None:
+        raise HTTPException(401, "Refresh token not found.")
+
+    user_execute = await db.execute(select(UserModel).where(UserModel.id == refresh_token_model.user_id))
+    user = user_execute.scalar_one_or_none()
+
+    if user is None:
+        raise HTTPException(404, "User not found.")
+
+    new_access_token = jwt_auth_manager.create_access_token(
+        data={"user_id": user.id},
+        expires_delta=timedelta(days=15)
+    )
+    activation_token = ActivationTokenModel(
+        user_id=cast(int, user.id),
+        token=new_access_token,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=15),
+    )
+
+    db.add(activation_token)
+    await db.commit()
+    await db.refresh(user, ["activation_token"])
+
+    return {"access_token": f"{new_access_token}"}
 
 
 @router.post("/login/", response_model=UserLoginResponseSchema, status_code=201)
