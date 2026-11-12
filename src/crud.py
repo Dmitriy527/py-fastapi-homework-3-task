@@ -4,7 +4,8 @@ from datetime import timedelta, datetime, timezone
 from typing import cast
 from dotenv import load_dotenv
 from sqlalchemy.orm import selectinload
-from security.token_manager import JWTAuthManager
+
+from config import get_jwt_auth_manager, get_settings
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -15,11 +16,7 @@ from security.passwords import hash_password
 
 
 load_dotenv()
-jwt_auth_manager = JWTAuthManager(
-    secret_key_access=os.getenv("SECRET_KEY_ACCESS"),
-    secret_key_refresh=os.getenv("SECRET_KEY_REFRESH"),
-    algorithm=os.getenv("JWT_SIGNING_ALGORITHM")
-)
+jwt_auth_manager = get_jwt_auth_manager(get_settings())
 
 
 async def get_user_by_email(db: AsyncSession, email: str) -> UserModel:

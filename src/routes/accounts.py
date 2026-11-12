@@ -7,6 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
+
+from config import get_jwt_auth_manager, get_settings
 from crud import create_user, get_user_by_email, create_reset_token
 from database import (
     get_db,
@@ -29,16 +31,11 @@ from schemas.accounts import (
     TokenRefreshRequestSchema
 )
 from security.passwords import hash_password, verify_password
-from security.token_manager import JWTAuthManager
 
 
 load_dotenv()
 router = APIRouter()
-jwt_auth_manager = JWTAuthManager(
-    secret_key_access=os.getenv("SECRET_KEY_ACCESS"),
-    secret_key_refresh=os.getenv("SECRET_KEY_REFRESH"),
-    algorithm=os.getenv("JWT_SIGNING_ALGORITHM")
-)
+jwt_auth_manager = get_jwt_auth_manager(get_settings())
 
 
 @router.post("/refresh/", response_model=TokenRefreshResponseSchema, status_code=200)
