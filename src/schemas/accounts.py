@@ -1,6 +1,4 @@
-from pydantic import BaseModel, field_validator, ConfigDict
-from datetime import datetime
-
+from pydantic import BaseModel, field_validator
 from database.validators.accounts import validate_email, validate_password_strength
 
 
@@ -45,16 +43,9 @@ class UserRegistrationRequestSchema(UserBase):
         return password
 
 
-# class TokenOut(BaseModel):
-#     model_config = ConfigDict(from_attributes=True)
-#     token: str
-#     expires_at: datetime
-
-
 class UserRegistrationResponseSchema(UserBase):
     id: int
     email: str
-    # activation_token: TokenOut | None = None
 
     class Config:
         from_attributes = True

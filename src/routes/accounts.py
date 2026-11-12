@@ -7,7 +7,6 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
-
 from crud import create_user, get_user_by_email, create_reset_token
 from database import (
     get_db,
@@ -16,10 +15,19 @@ from database import (
     RefreshTokenModel
 )
 from exceptions import TokenExpiredError, InvalidTokenError
-from schemas import UserRegistrationResponseSchema, UserRegistrationRequestSchema, UserActivationRequestSchema, \
-    TokenRefreshResponseSchema, UserLoginRequestSchema
-from schemas.accounts import UserBase, PasswordResetCompleteRequestSchema, UserLoginResponseSchema, \
+from schemas import (
+    UserRegistrationResponseSchema,
+    UserRegistrationRequestSchema,
+    UserActivationRequestSchema,
+    TokenRefreshResponseSchema,
+    UserLoginRequestSchema
+)
+from schemas.accounts import (
+    UserBase,
+    PasswordResetCompleteRequestSchema,
+    UserLoginResponseSchema,
     TokenRefreshRequestSchema
+)
 from security.passwords import hash_password, verify_password
 from security.token_manager import JWTAuthManager
 
@@ -135,7 +143,6 @@ async def password_reset_request(data: UserBase, db: AsyncSession = Depends(get_
     if user and user.is_active:
         await create_reset_token(db=db, user=user)
     return {"message": "If you are registered, you will receive an email with instructions."}
-# {"message": f"Password reset token {user.password_reset_token.token} is valid!"}
 
 
 @router.post("/activate/", status_code=200)
