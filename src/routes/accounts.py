@@ -1,7 +1,5 @@
 from datetime import datetime, timezone, timedelta
-import os
 from typing import cast
-from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
@@ -33,7 +31,6 @@ from schemas.accounts import (
 from security.passwords import hash_password, verify_password
 
 
-load_dotenv()
 router = APIRouter()
 jwt_auth_manager = get_jwt_auth_manager(get_settings())
 

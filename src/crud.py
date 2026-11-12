@@ -1,8 +1,6 @@
-import os
 import secrets
 from datetime import timedelta, datetime, timezone
 from typing import cast
-from dotenv import load_dotenv
 from sqlalchemy.orm import selectinload
 
 from config import get_jwt_auth_manager, get_settings
@@ -15,7 +13,6 @@ from schemas import UserRegistrationRequestSchema
 from security.passwords import hash_password
 
 
-load_dotenv()
 jwt_auth_manager = get_jwt_auth_manager(get_settings())
 
 
@@ -59,7 +56,7 @@ async def create_reset_token(db: AsyncSession, user: UserModel):
         user_id=cast(int, user.id),
         token=jwt_auth_manager._create_token(
             data={"sub": user.email},
-            secret_key=os.getenv("SECRET_KEY_ACCESS"),
+            secret_key=secrets.token_urlsafe(64),
             expires_delta=timedelta(days=30)
         ),
         expires_at=datetime.now(timezone.utc) + timedelta(days=30)
