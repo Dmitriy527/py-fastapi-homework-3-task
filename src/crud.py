@@ -39,9 +39,7 @@ async def create_user(db: AsyncSession, user: UserRegistrationRequestSchema) -> 
     await db.flush()
 
     activation_token = ActivationTokenModel(
-        user_id=db_user.id,
-        token=secrets.token_urlsafe(64),
-        expires_at=datetime.now(timezone.utc) + timedelta(days=15)
+        user_id=db_user.id
     )
 
     db.add(activation_token)

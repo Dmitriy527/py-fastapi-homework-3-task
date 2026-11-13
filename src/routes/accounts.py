@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import cast
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -6,7 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
-from config import get_jwt_auth_manager, get_settings
+from config import get_jwt_auth_manager
 from crud import create_user, get_user_by_email, create_reset_token
 from database import (
     get_db,
@@ -28,17 +28,21 @@ from schemas.accounts import (
     UserLoginResponseSchema,
     TokenRefreshRequestSchema
 )
+from security.interfaces import JWTAuthManagerInterface
 from security.passwords import hash_password, verify_password
 
 
 router = APIRouter()
-jwt_auth_manager = get_jwt_auth_manager(get_settings())
 
 
 @router.post("/refresh/", response_model=TokenRefreshResponseSchema, status_code=200)
-async def refresh_token(request: TokenRefreshRequestSchema, db: AsyncSession = Depends(get_db)):
+async def refresh_token(
+        request: TokenRefreshRequestSchema,
+        db: AsyncSession = Depends(get_db),
+        jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager)
+):
     try:
-        data = jwt_auth_manager.decode_refresh_token(token=request.refresh_token)
+        data = jwt_manager.decode_refresh_token(token=request.refresh_token)
     except TokenExpiredError:
         raise HTTPException(400, "Token has expired.")
     except InvalidTokenError:
@@ -60,16 +64,19 @@ async def refresh_token(request: TokenRefreshRequestSchema, db: AsyncSession = D
     if user is None:
         raise HTTPException(404, "User not found.")
 
-    new_access_token = jwt_auth_manager.create_access_token(
-        data={"user_id": user.id},
-        expires_delta=timedelta(days=15)
+    new_access_token = jwt_manager.create_access_token(
+        data={"user_id": user.id}
     )
 
     return {"access_token": f"{new_access_token}"}
 
 
 @router.post("/login/", response_model=UserLoginResponseSchema, status_code=201)
-async def login(request: UserLoginRequestSchema, db: AsyncSession = Depends(get_db)):
+async def login(
+        request: UserLoginRequestSchema,
+        db: AsyncSession = Depends(get_db),
+        jwt_manager: JWTAuthManagerInterface = Depends(get_jwt_auth_manager)
+):
     user = await get_user_by_email(db=db, email=request.email)
 
     if not user or not verify_password(request.password, user._hashed_password):
@@ -80,7 +87,7 @@ async def login(request: UserLoginRequestSchema, db: AsyncSession = Depends(get_
     user_id = user.id
 
     try:
-        refresh_token = jwt_auth_manager.create_refresh_token(data={"user_id": user_id})
+        refresh_token = jwt_manager.create_refresh_token(data={"user_id": user_id})
         refresh_token_model = RefreshTokenModel.create(user_id=cast(int, user_id), days_valid=7, token=refresh_token)
         db.add(refresh_token_model)
         await db.commit()
@@ -89,7 +96,7 @@ async def login(request: UserLoginRequestSchema, db: AsyncSession = Depends(get_
         await db.rollback()
         raise HTTPException(500, "An error occurred while processing the request.")
 
-    access_token = jwt_auth_manager.create_access_token(data={"user_id": user_id})
+    access_token = jwt_manager.create_access_token(data={"user_id": user_id})
 
     return UserLoginResponseSchema(access_token=access_token, refresh_token=refresh_token, token_type="bearer")
 
@@ -161,7 +168,7 @@ async def user_activation(
         raise HTTPException(400, "Invalid or expired activation token.")
 
     expires_at = token.expires_at
-    if expires_at.tzinfo is None:  # SQLite повертає naive datetime
+    if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
 
     if expires_at < datetime.now(timezone.utc):
